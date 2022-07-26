@@ -11,16 +11,17 @@ class Yolo_Loss(nn.Module):
         self.lambda_obj = 1
 
 
-    def forward(self, prediction, label):
-        """
-        Computes difference between prediction and label.
-        
-        Input:
-        =prediction=    Tensor of all prediction arrays of size (n_batches, 10647, 5+n_classes).
-        =label=         Tensor of all label arryays of size (n_batches, 10647, 5+n_classes).
-        
-        Output:
-        =loss=          Total loss computed for this batch.
+    def forward(self, prediction: torch.FloatTensor, label: torch.FloatTensor) -> float:
+        """Computes loss between prediction and label.
+
+        Args:
+            prediction (torch.FloatTensor): Tensor of all prediction arrays of size 
+                                                (n_batches, 10647, 5+n_classes).
+            label (torch.FloatTensor): Tensor of all label arrays of size 
+                                            (n_batches, 10647, 5+n_classes).
+
+        Returns:
+            loss (float): Total loss computed for this batch.
         """
         batch_size = prediction.shape[0]
 
