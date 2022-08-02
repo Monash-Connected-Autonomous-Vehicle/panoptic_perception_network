@@ -60,7 +60,7 @@ def filter_labels(raw_json: object) -> dict:
     
     return data_labels
 
-def load_classes(namesfile: Union[str, bytes, os.PathLike]) -> list[str]:
+def load_classes(namesfile: Union[str, bytes, os.PathLike]):
     """Loads file containing the unique classes of objects within the BDD100k dataset.
 
     Args:

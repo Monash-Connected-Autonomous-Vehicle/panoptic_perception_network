@@ -20,7 +20,7 @@ def test_forward_pass() -> torch.FloatTensor:
     reshaped_img = Variable(reshaped_img) # convert to variable
     return reshaped_img
 
-def parse_cfg(cfgfile: Union[str, bytes, os.PathLike]) -> list:
+def parse_cfg(cfgfile: Union[str, bytes, os.PathLike]):
     """Parses config file and stores every block as a dicts.
     
     Attributes and their values are stored as key-value pairs.

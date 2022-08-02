@@ -11,7 +11,7 @@ class Yolo_Loss(nn.Module):
         self.lambda_obj = 1
 
 
-    def forward(self, prediction: torch.FloatTensor, label: torch.FloatTensor) -> float:
+    def forward(self, prediction, label):
         """Computes loss between prediction and label.
 
         Args:
