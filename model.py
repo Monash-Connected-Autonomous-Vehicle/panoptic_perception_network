@@ -75,7 +75,7 @@ class DetectionLayer(nn.Module):
         super(DetectionLayer, self).__init__()
         self.anchors = anchors
 
-def create_modules(blocks: list[dict]) -> tuple:
+def create_modules(blocks):
     """Creates tuple with general network information/hyperparams and ModuleList containing details of each block within network.
 
     Args:

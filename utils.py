@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import cv2 
 
-def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors: list[tuple], n_classes: int, CUDA: bool = True) -> torch.FloatTensor:
+def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_classes: int, CUDA: bool = True) -> torch.FloatTensor:
     """Converts detection feature map from convolution layer into 2D tensor, where each row are attributes of bbox.
 
     Args:

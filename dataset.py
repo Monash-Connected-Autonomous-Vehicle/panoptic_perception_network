@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from skimage import io
-from tqdm import tqdm
 import cv2
 
 def filter_labels(raw_json: object) -> dict:
@@ -42,6 +41,7 @@ def filter_labels(raw_json: object) -> dict:
     """
     raw_df = pd.read_json(raw_json)
     data_labels = {}
+
     for idx, label in enumerate(raw_df["labels"]):
         # skip nan labels
         if type(label) == float:
@@ -50,6 +50,8 @@ def filter_labels(raw_json: object) -> dict:
         obj = {}
 
         for object in label:
+            if object["category"] in ["drivable area", 'lane']:
+                continue
             #obj["id"] = object["id"] # object id probs not useful?
             obj["category"] = object["category"]
             obj["box2d"] = object["box2d"]
@@ -60,7 +62,7 @@ def filter_labels(raw_json: object) -> dict:
     
     return data_labels
 
-def load_classes(namesfile: Union[str, bytes, os.PathLike]) -> list[str]:
+def load_classes(namesfile: Union[str, bytes, os.PathLike]):
     """Loads file containing the unique classes of objects within the BDD100k dataset.
 
     Args:
@@ -260,6 +262,8 @@ class DetectionDataset(Dataset):
 
         ## collect all image names
         img_name = list(self.labels.keys())[idx]
+
+        # check in image
         image = io.imread(os.path.join(self.root_dir, img_name))
         
         ## collect all labels per image

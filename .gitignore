@@ -12,3 +12,4 @@ annotations/instances_val2017.json
 annotations/person_keypoints_train2017.json
 annotations/person_keypoints_val2017.json
 yolo_layer_input.pt
+wandb/*
