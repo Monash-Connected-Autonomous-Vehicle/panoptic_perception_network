@@ -13,6 +13,7 @@ class Yolo_Loss(nn.Module):
         self.LAMBDA_OBJ = 1
 
         self.bce = nn.BCELoss()
+        self.bcewll = nn.BCEWithLogitsLoss()
         self.mse = nn.MSELoss()
         self.ce = nn.CrossEntropyLoss()
 
@@ -58,13 +59,13 @@ class Yolo_Loss(nn.Module):
         torch.save(label, "ex_tensors/loss_label.pt")
         torch.save(prediction, "ex_tensors/loss_pred.pt")
         # NO OBJECT LOSS
-        no_obj_loss = self.bce(
+        no_obj_loss = self.bcewll(
             (pred_obj_prob[njs]), (label_obj_prob[njs])
         )
         #print(no_obj_loss)
 
         # OBJECT LOSS
-        obj_loss = self.bce(
+        obj_loss = self.bcewll(
             (pred_obj_prob[objs]), (label_obj_prob[objs])
         )
         #print(obj_loss)

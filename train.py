@@ -93,10 +93,11 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
         input_img, labels = data.values()
         optimizer.zero_grad()
 
-        # forward pass
-        outputs = net(input_img.to(device), CUDA)
-        # compute loss
-        loss = criterion(outputs, labels).float()
+        with torch.cuda.amp.autocast():
+            # forward pass
+            outputs = net(input_img.to(device), CUDA)
+            # compute loss
+            loss = criterion(outputs, labels).float()
         
         # back prop        
         loss.backward()
