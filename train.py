@@ -11,7 +11,7 @@ from model import *
 from dataset import DetectionDataset, Pad, ToTensor, Normalise
 from loss import Yolo_Loss
 
-wandb.init(project="yolov3-train-val-1")
+wandb.init(project="yolov3-train-val-2")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -22,7 +22,7 @@ root_dir = "/home/mcav/DATASETS/bdd100k/images/100k/val"                # images
 # hyperparams
 # val size: 10,000
 bs = 16
-learning_rate = 0.0000001
+learning_rate = 1e-3
 n_epoch = 10
 
 # set rgb mean and std for normalise
@@ -30,6 +30,7 @@ rgb_mean = [92.11938007161459, 102.83839236762152, 104.90335580512152]
 rgb_std  = [66.09941202519124, 70.6808655565459, 75.05305001603533]
 
 ## Load custom dataset + transforms
+print("Loading Dataset...")
 transformed_train_data = DetectionDataset(
     label_dict=label_dict,                      # labels corresponding to images
     root_dir=root_dir,                          # images root dir
@@ -57,8 +58,10 @@ train_loader = DataLoader(
     shuffle=True
     #num_workers=1
 )
+print("Done.")
 
 ## Define network
+print("Loading Network...")
 net = Net(cfgfile="cfg/model.cfg").to(device)
 
 ## Define Loss Function and Optimiser
@@ -68,6 +71,7 @@ optimizer = optim.SGD(
     lr=learning_rate, 
     momentum=0.9
     )
+print("Done.")
 
 ## Train network
 CUDA = torch.cuda.is_available()

@@ -7,10 +7,10 @@ class Yolo_Loss(nn.Module):
     def __init__(self):
         super().__init__()
         # lambda constants
-        self.lambda_class = 1
-        self.lambda_noobj = 5
-        self.lambda_box = 5
-        self.lambda_obj = 1
+        self.LAMBDA_CLS = 1
+        self.LAMBDA_NO_OBJ = 5
+        self.LAMBDA_BBOX = 5
+        self.LAMBDA_OBJ = 1
 
         self.bce = nn.BCELoss()
         self.mse = nn.MSELoss()
@@ -31,32 +31,61 @@ class Yolo_Loss(nn.Module):
         Returns:
             loss (float): Total loss computed for this batch.
         """
-
+        
+        # if GPU exists, move tensors there
         if self.CUDA:
             prediction = prediction.to(self.device)
             label = label.to(self.device)
 
+        # create masks for object and no object
         objs = (label[...,4] == 1)
-        njs = (label[...,4] == 10)
+        njs = (label[...,4] == 0)
 
+        # separate out components of prediction tensor
+        pred_obj_prob = prediction[...,4].float()
+        pred_bbox_centre = prediction[..., 0:2]
+        pred_bbox_dims = prediction[..., 2:4]
+        pred_cls_logits = prediction[..., 5:]
+
+        # separate out components of label tensor
+        label_obj_prob = label[...,4].float()
+        label_bbox_centre = label[..., 0:2]
+        label_bbox_dims = label[..., 2:4]
+        label_cls_logits = label[..., 5:]
+
+
+        # NO OBJECT LOSS
         no_obj_loss = self.bce(
-            (prediction[...,4][njs].float()), (label[..., 4][njs].float())
+            (pred_obj_prob[njs]), (label_obj_prob[njs])
         )
+        #print(no_obj_loss)
 
+        # OBJECT LOSS
         obj_loss = self.bce(
-            (prediction[...,4][objs].float()), (label[...,4][objs].float())
+            (pred_obj_prob[objs]), (label_obj_prob[objs])
         )
+        #print(obj_loss)
 
-        bbox_loss = self.mse(
-            (torch.sqrt(prediction[..., 0:4][objs])), (torch.sqrt(label[..., 0:4][objs]))
+        # BBOX LOSS
+        bbox_centre_loss = self.mse(
+            (torch.sqrt(pred_bbox_centre[objs])), (torch.sqrt(label_bbox_centre[objs]))
         )
+        bbox_dims_loss = self.mse(
+            (torch.sqrt(pred_bbox_dims[objs])), (torch.sqrt(label_bbox_dims[objs]))
+        )
+        bbox_loss = bbox_centre_loss + bbox_dims_loss
+        #print(bbox_loss)
 
-        cls_argmaxs = torch.argmax(label[..., 5:], dim=-1)
+        # CLASS LOSS
+        # eed to get idx of correct class for each tensor
+        # this is just how nn.CrossEntropyLoss() inputs labels 
+        cls_argmaxs = torch.argmax(label_cls_logits, dim=-1)  
         class_loss = self.ce(
-            (prediction[...,5:][objs]), (cls_argmaxs[objs])
+            (pred_cls_logits[objs]), (cls_argmaxs[objs])
         )
+        #print(class_loss)
 
         ## combine all losses
-        loss = self.lambda_box*bbox_loss + self.lambda_obj*obj_loss + self.lambda_noobj*no_obj_loss + self.lambda_class*class_loss
+        loss = self.LAMBDA_BBOX*bbox_loss + self.LAMBDA_OBJ*obj_loss + self.LAMBDA_NO_OBJ*no_obj_loss + self.LAMBDA_CLS*class_loss
         
         return loss
