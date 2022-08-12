@@ -47,13 +47,16 @@ class Yolo_Loss(nn.Module):
         pred_bbox_dims = prediction[..., 2:4]
         pred_cls_logits = prediction[..., 5:]
 
+        print(pred_obj_prob)
+
         # separate out components of label tensor
         label_obj_prob = label[...,4].float()
         label_bbox_centre = label[..., 0:2]
         label_bbox_dims = label[..., 2:4]
         label_cls_logits = label[..., 5:]
 
-
+        torch.save(label, "ex_tensors/loss_label.pt")
+        torch.save(prediction, "ex_tensors/loss_pred.pt")
         # NO OBJECT LOSS
         no_obj_loss = self.bce(
             (pred_obj_prob[njs]), (label_obj_prob[njs])

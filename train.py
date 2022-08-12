@@ -11,7 +11,7 @@ from model import *
 from dataset import DetectionDataset, Pad, ToTensor, Normalise
 from loss import Yolo_Loss
 
-wandb.init(project="yolov3-train-val-2")
+#wandb.init(project="yolov3-train-val-2")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -79,11 +79,11 @@ all_losses = []
 
 
 
-wandb.config = {
-    "learning_rate": learning_rate,
-    "epochs": n_epoch,
-    "batch_size": bs
-}
+# wandb.config = {
+#     "learning_rate": learning_rate,
+#     "epochs": n_epoch,
+#     "batch_size": bs
+# }
 
 print("Training...")
 for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoch times
@@ -102,7 +102,7 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
         loss.backward()
         optimizer.step()
         print(loss)
-        wandb.log({"loss": loss})
+        #wandb.log({"loss": loss})
         
         # print stats
         running_loss +=loss.item()

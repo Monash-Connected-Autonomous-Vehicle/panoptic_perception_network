@@ -1,6 +1,6 @@
 
 *.pyc
-weights/
+weights/*
 dets/
 dets/det_0000f77c-6257be58.jpg
 dets/det_0000f77c-62c2a288.jpg
@@ -13,3 +13,4 @@ annotations/person_keypoints_train2017.json
 annotations/person_keypoints_val2017.json
 yolo_layer_input.pt
 wandb/*
+debug.py
