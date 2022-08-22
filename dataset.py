@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 import os
 import torch
+import glob
 from typing import Union
 from torch.utils.data import Dataset
 import numpy as np
@@ -9,7 +10,7 @@ import matplotlib.pyplot as plt
 from skimage import io
 import cv2
 
-def filter_labels(raw_json: object) -> dict:
+def filter_labels(raw_json: object, root_dir) -> dict:
     """Re-organises json file into dictionary, such that:
         - keys =    image names.
         - values =  list of dictionaries which contain key value information for each labelled 
@@ -39,10 +40,15 @@ def filter_labels(raw_json: object) -> dict:
     Returns:
         data_labels (dict): Dictionary with only appropriate labels corresponding to image name.
     """
-    raw_df = pd.read_json(raw_json)
+    raw_df      = pd.read_json(raw_json)
+
+    list_images = glob.glob(root_dir + '/*.jpg')
+    list_images = [name[45:] for name in list_images]
+
     data_labels = {}
 
     for idx, label in enumerate(raw_df["labels"]):
+
         # skip nan labels
         if type(label) == float:
             continue
@@ -52,13 +58,16 @@ def filter_labels(raw_json: object) -> dict:
         for object in label:
             if object["category"] in ["drivable area", 'lane']:
                 continue
-            #obj["id"] = object["id"] # object id probs not useful?
             obj["category"] = object["category"]
             obj["box2d"] = object["box2d"]
             objects.append(obj)
             obj = {}
 
-        data_labels[str(raw_df["name"][idx])] = objects
+        # only import images both in the labels
+        # and have images associated with them
+        image_name = str(raw_df["name"][idx])
+        if  image_name in list_images:
+            data_labels[image_name] = objects
     
     return data_labels
 
@@ -242,12 +251,15 @@ class DetectionDataset(Dataset):
                             Expected size: (n_grid_sizes, n_anchors, 2) -> 2 being size of (anchor_w, anchor_h)
             transform (object, optional): Optional transform to be applied on a sample. Defaults to None.
         """
-        self.labels = filter_labels(label_dict)
+
         self.root_dir = root_dir
-        self.classes = np.array(load_classes(classes_file)) # loads a array of strings
         self.grid_sizes = np.array(grid_sizes)
         self.anchors = anchors
         self.transform = transform
+        self.classes = np.array(load_classes(classes_file)) # loads a array of strings
+
+        self.labels = filter_labels(label_dict, root_dir)
+        
     
     def __len__(self):
         """Returns size of dataset.

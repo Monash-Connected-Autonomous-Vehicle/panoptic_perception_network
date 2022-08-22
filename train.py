@@ -5,7 +5,7 @@ import numpy as np
 import torch.optim as optim
 from torch.utils.data import DataLoader
 #from tqdm import tqdm
-import wandb
+# import wandb
 
 from model import *
 from dataset import DetectionDataset, Pad, ToTensor, Normalise
@@ -16,8 +16,8 @@ from loss import Yolo_Loss
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ## Load data
-label_dict = "/home/mcav/DATASETS/bdd100k/labels/bdd100k_labels_images_val.json"   # labels json 
-root_dir = "/home/mcav/DATASETS/bdd100k/images/100k/val"                # images file
+label_dict = "/home/laksh/DATASETS/bdd100k/labels/bdd100k_labels_images_val.json"   # labels json 
+root_dir = "/home/laksh/DATASETS/bdd100k/images/100k/val"                # images file
 
 # hyperparams
 # val size: 10,000
@@ -29,7 +29,7 @@ n_epoch = 10
 rgb_mean = [92.11938007161459, 102.83839236762152, 104.90335580512152]
 rgb_std  = [66.09941202519124, 70.6808655565459, 75.05305001603533]
 
-## Load custom dataset + transforms
+# Load custom dataset + transforms
 print("Loading Dataset...")
 transformed_train_data = DetectionDataset(
     label_dict=label_dict,                      # labels corresponding to images
@@ -55,14 +55,15 @@ transformed_train_data = DetectionDataset(
 train_loader = DataLoader(
     transformed_train_data,
     batch_size=bs,
-    shuffle=True
-    #num_workers=1
+    shuffle=True,
+    num_workers=4
 )
 print("Done.")
 
 ## Define network
 print("Loading Network...")
 net = Net(cfgfile="cfg/model.cfg").to(device)
+
 
 ## Define Loss Function and Optimiser
 criterion = Yolo_Loss()
@@ -73,17 +74,16 @@ optimizer = optim.SGD(
     )
 print("Done.")
 
+
 ## Train network
 CUDA = torch.cuda.is_available()
 all_losses = []
 
-
-
-# wandb.config = {
-#     "learning_rate": learning_rate,
-#     "epochs": n_epoch,
-#     "batch_size": bs
-# }
+# # wandb.config = {
+# #     "learning_rate": learning_rate,
+# #     "epochs": n_epoch,
+# #     "batch_size": bs
+# # }
 
 print("Training...")
 for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoch times
@@ -113,9 +113,12 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
 
             running_loss = 0.0
 
+        break
+    break
 
 
-print("Training complete.")
 
-# save weights
-torch.save(net.state_dict(), "weights/100_images.weights")
+# print("Training complete.")
+
+# # save weights
+# torch.save(net.state_dict(), "weights/100_images.weights")
