@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import cv2 
 
-def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_classes: int, CUDA: bool = True) -> torch.FloatTensor:
+def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_classes: int, CUDA: bool = True, training=True) -> torch.FloatTensor:
     """Converts detection feature map from convolution layer into 2D tensor, where each row are attributes of bbox.
 
     Args:
@@ -74,29 +74,32 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     ## apply anchors to dimensions of bbox
     # log transform height and width
 
-    # convert to tensor
-    anchors = torch.FloatTensor(anchors) # size (n_anchors, 2)
+    if training:
+        # convert to tensor
+        anchors = torch.FloatTensor(anchors) # size (n_anchors, 2)
 
-    if CUDA:
-        anchors = anchors.cuda()
+        if CUDA:
+            anchors = anchors.cuda()
 
-    anchors = anchors.repeat(grid_size*grid_size, 1).unsqueeze(0) # size (1, grid_size*grid_size, 2)
-    
-    # apply anchors to bbox width and height (indices 2, 3 of bbox attrs row)
-    prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors
+        anchors = anchors.repeat(grid_size*grid_size, 1).unsqueeze(0) # size (1, grid_size*grid_size, 2)
 
-    ## apply sigmoid activation to class scores
-    prediction[:,:,5:5+n_classes] = torch.sigmoid((prediction[:,:,5:5+n_classes]))
+        print(anchors)
+        
+        # apply anchors to bbox width and height (indices 2, 3 of bbox attrs row)
+        prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors
 
-    # resize detection map to size of input image
-    # bbox attributes are sized according to feature map e.g. 13x13
-    # if input image is 416x416, multiply attributes by 32, or stride
+        ## apply sigmoid activation to class scores
+        prediction[:,:,5:5+n_classes] = torch.sigmoid((prediction[:,:,5:5+n_classes]))
 
-    # only need to apply to x, y centres, height and width
-    prediction[:,:,:4] = prediction[:,:,:4]*stride
+        # resize detection map to size of input image
+        # bbox attributes are sized according to feature map e.g. 13x13
+        # if input image is 416x416, multiply attributes by 32, or stride
 
-    # print("POST: {}".format(prediction.shape))
-    # print(prediction)
+        # only need to apply to x, y centres, height and width
+        prediction[:,:,:4] = prediction[:,:,:4]*stride
+
+        # print("POST: {}".format(prediction.shape))
+        # print(prediction)
 
     return prediction
 

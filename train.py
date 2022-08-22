@@ -79,42 +79,42 @@ print("Done.")
 CUDA = torch.cuda.is_available()
 all_losses = []
 
+sample = transformed_train_data.__getitem__(0)["image"].to(device).unsqueeze(dim=0)
+print(net(sample, CUDA))
+
 # # wandb.config = {
 # #     "learning_rate": learning_rate,
 # #     "epochs": n_epoch,
 # #     "batch_size": bs
 # # }
 
-print("Training...")
-for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoch times
+# print("Training...")
+# for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoch times
 
-    running_loss = 0.0
-    for i, data in enumerate(train_loader):
-        input_img, labels = data.values()
-        optimizer.zero_grad()
+#     running_loss = 0.0
+#     for i, data in enumerate(train_loader):
+#         input_img, labels = data.values()
+#         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast():
-            # forward pass
-            outputs = net(input_img.to(device), CUDA)
-            # compute loss
-            loss = criterion(outputs, labels).float()
+#         with torch.cuda.amp.autocast():
+#             # forward pass
+#             outputs = net(input_img.to(device), CUDA)
+#             # compute loss
+#             loss = criterion(outputs, labels).float()
         
-        # back prop        
-        loss.backward()
-        optimizer.step()
-        print(loss)
-        #wandb.log({"loss": loss})
+#         # back prop        
+#         loss.backward()
+#         optimizer.step()
+#         print(loss)
+#         #wandb.log({"loss": loss})
         
-        # print stats
-        running_loss +=loss.item()
-        if i % bs == bs-1: # print every bs mini-batches
-            print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / bs:.3f}')
-            all_losses.append(running_loss / bs)
+#         # print stats
+#         running_loss +=loss.item()
+#         if i % bs == bs-1: # print every bs mini-batches
+#             print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / bs:.3f}')
+#             all_losses.append(running_loss / bs)
 
-            running_loss = 0.0
-
-        break
-    break
+#             running_loss = 0.0
 
 
 

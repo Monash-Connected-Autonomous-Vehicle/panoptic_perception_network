@@ -295,13 +295,15 @@ class Net(nn.Module):
                 # print("Before predict_transform")
                 # print(x.requires_grad)
                 #x = x.data
+        
 
                 x = predict_transform(
                     prediction=x, # size (n_batches, n_conv_filters_from_prev_layer, filter_w, filter_h)
                     in_dims=in_dims, # model height
                     anchors=anchors, # [(a1_w, a1_h), (a2_w, a2_h), (a3_w, a3_h)]
                     n_classes=n_classes,
-                    CUDA=CUDA
+                    CUDA=CUDA, 
+                    training=self.training
                 )
 
                 # if this is the FIRST YOLO DETECTION LAYER, then initiate collector

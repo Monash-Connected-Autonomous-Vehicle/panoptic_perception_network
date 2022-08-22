@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+from utils import *
 
 class Yolo_Loss(nn.Module):
     def __init__(self):
@@ -35,7 +35,7 @@ class Yolo_Loss(nn.Module):
         
         # if GPU exists, move tensors there
         if self.CUDA:
-            prediction = prediction.to(self.device)
+            prediction = predict_transform(prediction.to(self.device))
             label = label.to(self.device)
 
         # create masks for object and no object
@@ -47,8 +47,6 @@ class Yolo_Loss(nn.Module):
         pred_bbox_centre = prediction[..., 0:2]
         pred_bbox_dims = prediction[..., 2:4]
         pred_cls_logits = prediction[..., 5:]
-
-        print(pred_obj_prob)
 
         # separate out components of label tensor
         label_obj_prob = label[...,4].float()
