@@ -11,7 +11,7 @@ from model import *
 from dataset import DetectionDataset, Pad, ToTensor, Normalise
 from loss import Yolo_Loss
 
-#wandb.init(project="yolov3-train-val-2")
+wandb.init(project="yolov3-train-val-2")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -79,11 +79,13 @@ all_losses = []
 
 
 
-# wandb.config = {
-#     "learning_rate": learning_rate,
-#     "epochs": n_epoch,
-#     "batch_size": bs
-# }
+wandb.config = {
+    "learning_rate": learning_rate,
+    "epochs": n_epoch,
+    "batch_size": bs
+}
+
+torch.autograd.set_detect_anomaly(True)
 
 print("Training...")
 for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoch times
@@ -93,25 +95,25 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
         input_img, labels = data.values()
         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast():
-            # forward pass
-            outputs = net(input_img.to(device), CUDA)
-            # compute loss
-            loss = criterion(outputs, labels).float()
+        # torch.cuda.amp.autocast()
+        # forward pass
+        outputs = net(input_img.to(device), CUDA)
+        # compute loss
+        loss = criterion(outputs, labels).float()
         
-        # back prop        
+        # back prop      
         loss.backward()
         optimizer.step()
-        print(loss)
-        #wandb.log({"loss": loss})
+        #print(loss)
         
         # print stats
         running_loss +=loss.item()
         if i % bs == bs-1: # print every bs mini-batches
             print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / bs:.3f}')
             all_losses.append(running_loss / bs)
-
+            wandb.log({"loss": running_loss / bs})
             running_loss = 0.0
+
 
 
 

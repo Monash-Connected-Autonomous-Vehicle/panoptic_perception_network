@@ -33,6 +33,9 @@ class Yolo_Loss(nn.Module):
             loss (float): Total loss computed for this batch.
         """
         
+        # print(f"pred:   {prediction}")
+        # print(f"label:  {label}")
+
         # if GPU exists, move tensors there
         if self.CUDA:
             prediction = prediction.to(self.device)
@@ -48,7 +51,7 @@ class Yolo_Loss(nn.Module):
         pred_bbox_dims = prediction[..., 2:4]
         pred_cls_logits = prediction[..., 5:]
 
-        print(pred_obj_prob)
+        #print(pred_obj_prob)
 
         # separate out components of label tensor
         label_obj_prob = label[...,4].float()

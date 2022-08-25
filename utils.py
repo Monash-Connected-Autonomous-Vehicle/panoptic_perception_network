@@ -31,6 +31,7 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     grid_size = prediction.shape[2]
     bbox_attrs = 5 + n_classes
     n_anchors = len(anchors)
+    eps = 1e-10
 
     # print("PRE:")
     # print(prediction)
@@ -83,7 +84,13 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     anchors = anchors.repeat(grid_size*grid_size, 1).unsqueeze(0) # size (1, grid_size*grid_size, 2)
     
     # apply anchors to bbox width and height (indices 2, 3 of bbox attrs row)
-    prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors
+    # print("before:")
+    # print(f"    min:    {torch.min(prediction[:,:,2:4])}")
+    # print(f"    max:    {torch.max(prediction[:,:,2:4])}")
+    prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors + eps
+    # print("after:")
+    # print(f"    min:    {torch.min(prediction[:,:,2:4])}")
+    # print(f"    max:    {torch.max(prediction[:,:,2:4])}")
 
     ## apply sigmoid activation to class scores
     prediction[:,:,5:5+n_classes] = torch.sigmoid((prediction[:,:,5:5+n_classes]))
