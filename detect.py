@@ -61,13 +61,13 @@ def arg_parse():
         default="cfg/model.cfg",
         type=str
     )
-    parser.add_argument(
-        "--weights",
-        dest="weights",
-        help="YOLOv3 pre-trained weights.",
-        default="weights/yolov3.weights",
-        type=str
-    )
+    # parser.add_argument(
+    #     "--weights",
+    #     dest="weights",
+    #     help="YOLOv3 pre-trained weights.",
+    #     default="weights/ADAM_100_images.weights",
+    #     type=str
+    # )
     parser.add_argument(
         "--res",
         dest="res",
@@ -91,13 +91,14 @@ start = 0 # for timing
 CUDA = torch.cuda.is_available()
 
 n_classes = 12
-classes = load_classes("data/coco.names")
+classes = load_classes("data/bdd100k.names")
 
 
 ## init network and load weights
 print("Loading network...")
 model = Net(args.cfgfile)
-model.load_weights(args.weights)
+weight_path = "weights/100_images.weights"
+model.load_state_dict(torch.load(weight_path))
 print("Network loaded!")
 
 model.net_info["height"] = args.res
@@ -305,7 +306,8 @@ list(map(lambda x: draw_test_bbox(x, loaded_imgs), output))
 
 # each img saved by prefixing "det_" infront of image name
 # create a list of addresses to which we sasve detection images to
-det_names = pd.Series(img_list).apply(lambda x: "{}/det_{}".format(args.dets, x.split("\\")[-1]))
+print(img_list)
+det_names = pd.Series(img_list).apply(lambda x: "{}/det_{}".format(args.dets, x.split("/")[-1]))
 
 # write images with dets to address in det_names
 list(map(cv2.imwrite, det_names, loaded_imgs))

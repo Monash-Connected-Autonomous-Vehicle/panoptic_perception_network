@@ -77,6 +77,12 @@ class Yolo_Loss(nn.Module):
         ################################################################################
 
         # NO OBJECT LOSS
+
+        # print("pred_obj_prob max, min")
+        # print(pred_obj_prob[njs].max().item(), pred_obj_prob[njs].min().item())
+        # print("label_obj_prob max, min")
+        # print(label_obj_prob[njs].max().item(), label_obj_prob[njs].min().item())
+        
         no_obj_loss = self.bce(
             (pred_obj_prob[njs]), (label_obj_prob[njs])
         )
@@ -112,7 +118,7 @@ class Yolo_Loss(nn.Module):
 
         iou = self.bbox_iou(crn_pred_box, crn_label_box)
 
-        batch_iou = torch.mean(iou)*100
+        batch_iou = torch.max(iou)*100
 
         ################################################################################
 

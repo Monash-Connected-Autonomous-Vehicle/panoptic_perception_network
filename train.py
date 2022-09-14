@@ -6,12 +6,55 @@ from torch.utils.data import DataLoader
 #from tqdm import tqdm
 import time
 import wandb
+import argparse
 
 from model import *
 from dataset import DetectionDataset, Pad, ToTensor, Normalise
 from loss import Yolo_Loss
 
-wandb.init(project="yolov3-train-val-4")
+def arg_parse():
+    parser = argparse.ArgumentParser(description="YOLOv3 Train Module")
+
+    parser.add_argument(
+        "--bs",
+        dest="bs",
+        help="Batch size.",
+        default=16
+    )
+    parser.add_argument(
+        "--lr",
+        dest="lr",
+        help="Learning rate.",
+        default=1e-4
+    )
+    parser.add_argument(
+        "--wd",
+        dest="wd",
+        help="Weight decay for ADAM.",
+        default=1e-3
+    )
+    parser.add_argument(
+        "--ep",
+        dest="ep",
+        help="Number of training epochs.",
+        default=10
+    )
+    parser.add_argument(
+        "--opt",
+        dest="opt",
+        help="Training optimiser - SGD or ADAM",
+        default="ADAM",
+        type=str
+    )
+    parser.add_argument(
+        "--wb",
+        dest="wb",
+        help="Logging with weights and biases [1: True, 0: False]",
+        default=1,
+    )
+
+    return parser.parse_args()
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -21,19 +64,39 @@ root_dir = "/home/mcav/DATASETS/bdd100k/images/100k/val"                # images
 
 # hyperparams
 # val size: 10,000
-bs = 16
-learning_rate = 2e-4
-n_epoch = 10
+args = arg_parse()
+bs = int(args.bs)
+learning_rate = float(args.lr)
+weight_decay = float(args.wd)
+n_epoch = int(args.ep)
+opt = args.opt
+wb = bool(int(args.wb))
 
-wandb.config.batch_size = bs
-wandb.config.lr = learning_rate
-wandb.config.n_epoch = n_epoch
+print("CHOSEN ARGS")
+print("----------------------------------------------------------")
+print(f"Batch size:\t{bs}")
+print(f"Learning rate:\t{learning_rate}")
+print(f"Weight decay:\t{weight_decay}")
+print(f"Epochs:\t\t{n_epoch}")
+print(f"Optimiser:\t{opt}")
+print(f"Log metrics:\t{wb}")
+print("----------------------------------------------------------")
+
+if wb:
+    wandb.init(project="yolov3-train-val-4")
+    wandb.config.batch_size = bs
+    wandb.config.lr = learning_rate
+    wandb.config.weight_decay = weight_decay
+    wandb.config.n_epoch = n_epoch
+    wandb.config.optimizer = opt
+
 
 # set rgb mean and std for normalise
 rgb_mean = [92.11938007161459, 102.83839236762152, 104.90335580512152]
 rgb_std  = [66.09941202519124, 70.6808655565459, 75.05305001603533]
 
 ## Load custom dataset + transforms
+print("----------------------------------------------------------")
 print("Loading Dataset...")
 load_dataset_start = time.time()
 
@@ -62,10 +125,12 @@ train_loader = DataLoader(
     transformed_train_data,
     batch_size=bs,
     shuffle=True,
-    num_workers=8
+    num_workers=8,
+    pin_memory=True,
 )
 load_dataset_end = time.time()
 print(f"Done in {load_dataset_end - load_dataset_start:.3f}s.")
+print("----------------------------------------------------------")
 
 ## Define network
 print("Loading Network, Loss and Optimiser...")
@@ -75,15 +140,25 @@ net = Net(cfgfile="cfg/model.cfg").to(device)
 
 ## Define Loss Function and Optimiser
 criterion = Yolo_Loss()
-optimizer = optim.SGD(
-    params=net.parameters(), 
-    lr=learning_rate, 
-    momentum=0.9
+if opt == "SGD":
+    optimizer = optim.SGD(
+        params=net.parameters(), 
+        lr=learning_rate, 
+        momentum=0.9
+        )
+elif opt == "ADAM":
+    optimizer = optim.Adam(
+        params=net.parameters(),
+        lr=learning_rate,
+        weight_decay=weight_decay
     )
+else:
+    print("Only [SGD] and [ADAM] optimisers have been configured.")
+
 load_net_end = time.time()
 print(f"Done in {load_net_end - load_net_start:.3f}s.")
+print("----------------------------------------------------------")
 
-## Train network
 CUDA = torch.cuda.is_available()
 all_losses = []
 
@@ -91,6 +166,9 @@ all_losses = []
 ## TURN ON FOR DEBUGGING
 #torch.autograd.set_detect_anomaly(True)
 
+scaler = torch.cuda.amp.GradScaler()
+
+## Train network
 print("Training...")
 for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoch times
 
@@ -110,15 +188,20 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
         input_img, labels = data.values()
         optimizer.zero_grad()
 
-        #with torch.cuda.amp.autocast():
-        # forward pass
-        outputs = net(input_img.to(device), CUDA)
-        # compute loss
-        loss, no_obj_loss, obj_loss, bbox_loss, class_loss, cls_acc, objs_acc, njs_acc, iou = criterion(outputs, labels)
+        with torch.cuda.amp.autocast():
+            # forward pass
+            outputs = net(input_img.to(device), CUDA)
+            # compute loss
+            loss, no_obj_loss, obj_loss, bbox_loss, class_loss, cls_acc, objs_acc, njs_acc, iou = criterion(outputs, labels)
         
-        # back prop      
-        loss.float().backward()
-        optimizer.step()
+        # # without scaler     
+        # loss.float().backward()
+        # optimizer.step()
+
+        # with scaler        
+        scaler.scale(loss.float()).backward()
+        scaler.step(optimizer)
+        scaler.update()
         
         # log and print stats
         running_loss += loss.item()
@@ -135,17 +218,18 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
             epoch_end = time.time()
             print(f'[{epoch + 1}, {i + 1:5d}]\tloss: {running_loss / bs:.3f}\ttime: {(epoch_end - epoch_start) / bs:.3f}s')
             all_losses.append(running_loss / bs)
-            wandb.log({
-                "loss": running_loss / bs,
-                "no_obj_loss": running_no_obj_loss / bs,
-                "obj_loss": running_obj_loss / bs,
-                "bbox_loss": running_bbox_loss / bs,
-                "class_loss": running_class_loss / bs,
-                "class_acc": running_class_acc / bs,
-                "objs_acc": running_objs_acc / bs,
-                "njs_acc": running_njs_acc / bs,
-                "iou": running_iou / bs
-            })
+            if wb:
+                wandb.log({
+                    "loss": running_loss / bs,
+                    "no_obj_loss": running_no_obj_loss / bs,
+                    "obj_loss": running_obj_loss / bs,
+                    "bbox_loss": running_bbox_loss / bs,
+                    "class_loss": running_class_loss / bs,
+                    "class_acc": running_class_acc / bs,
+                    "objs_acc": running_objs_acc / bs,
+                    "njs_acc": running_njs_acc / bs,
+                    "iou": running_iou / bs
+                })
 
             # reset
             running_loss = 0.0
@@ -157,10 +241,12 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
             running_objs_acc = 0.0
             running_njs_acc = 0.0
             running_iou = 0.0
+    # save weights at the end of each epoch
+    torch.save(net.state_dict(), f"weights/during_run/epoch_{epoch}.weights")
 
 
 
 print("Training complete.")
 
 # save weights
-torch.save(net.state_dict(), "weights/100_images.weights")
+torch.save(net.state_dict(), f"weights/{opt}_{bs}_{learning_rate}_{n_epoch}_val.weights")

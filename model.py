@@ -324,7 +324,7 @@ class Net(nn.Module):
             outputs[idx] = x
         return detections
 
-    def load_weights(self, weightfile: Union[str, bytes, os.PathLike]):
+    def load_weights(self, weightfile):
         """
         Load pre-trained weights.
         """
