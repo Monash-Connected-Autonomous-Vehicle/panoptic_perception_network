@@ -83,7 +83,7 @@ print(f"Log metrics:\t{wb}")
 print("----------------------------------------------------------")
 
 if wb:
-    wandb.init(project="yolov3-train-val-4")
+    wandb.init(project="yolov3-train-val-5")
     wandb.config.batch_size = bs
     wandb.config.lr = learning_rate
     wandb.config.weight_decay = weight_decay
@@ -92,8 +92,10 @@ if wb:
 
 
 # set rgb mean and std for normalise
-rgb_mean = [92.11938007161459, 102.83839236762152, 104.90335580512152]
-rgb_std  = [66.09941202519124, 70.6808655565459, 75.05305001603533]
+rgb_mean = [92, 103, 105]
+rgb_std  = [66, 71, 75]
+# rgb_mean = [92.11938007161459, 102.83839236762152, 104.90335580512152]
+# rgb_std  = [66.09941202519124, 70.6808655565459, 75.05305001603533]
 
 ## Load custom dataset + transforms
 print("----------------------------------------------------------")
@@ -188,11 +190,11 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
         input_img, labels = data.values()
         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast():
-            # forward pass
-            outputs = net(input_img.to(device), CUDA)
-            # compute loss
-            loss, no_obj_loss, obj_loss, bbox_loss, class_loss, cls_acc, objs_acc, njs_acc, iou = criterion(outputs, labels)
+        # with torch.cuda.amp.autocast():
+        # forward pass
+        outputs = net(input_img.to(device), CUDA)
+        # compute loss
+        loss, no_obj_loss, obj_loss, bbox_loss, class_loss, cls_acc, objs_acc, njs_acc, iou = criterion(outputs, labels)
         
         # # without scaler     
         # loss.float().backward()

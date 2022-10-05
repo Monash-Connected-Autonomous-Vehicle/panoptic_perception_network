@@ -197,6 +197,78 @@ def draw_bbox(image: np.ndarray, bboxes: np.ndarray):
 
         plt.plot(x_points, y_points, 'r-')
 
+def draw_labels(images, labels):
+    if len(images.shape) == 3: # for batch size = 1
+        fig, ax = plt.subplots(1, 1)
+        cur_labels = labels
+        label_bboxes = cur_labels[cur_labels.sum(dim=1) != 0][...,:4]
+        box_corner = label_bboxes.new(label_bboxes.shape)
+        box_corner[...,0] = (label_bboxes[...,0] - label_bboxes[...,2]/2) # x_c - w/2 = x_min
+        box_corner[...,1] = (label_bboxes[...,1] - label_bboxes[...,3]/2) # y_c - h/2 = y_min
+        box_corner[...,2] = (label_bboxes[...,0] + label_bboxes[...,2]/2) # x_c + w/2 = x_max
+        box_corner[...,3] = (label_bboxes[...,1] + label_bboxes[...,3]/2) # y_c + h/2 = y_max
+
+        if images[0].max()>15: # sketchy way to check if its normalised or not
+            ax.imshow(images.type(torch.int32).permute(1,2,0))
+        else:
+            ax.imshow(images.permute(1,2,0))
+        
+        for box in box_corner:
+            x_points = [box[0], box[0], box[2], box[2], box[0]]
+            y_points = [box[1], box[3], box[3], box[1], box[1]]
+            
+            ax.plot(x_points, y_points, 'r-', linewidth=0.5)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(f"Labels: {box_corner.shape[0]}  ||  Objects: {box_corner.unique(dim=0).shape[0]}")
+    
+    else: # for batch size > 1
+        fig, axs = plt.subplots(1, images.shape[0])
+        for i, ax in enumerate(axs):
+            cur_labels = labels[i]
+            label_bboxes = cur_labels[cur_labels.sum(dim=1) != 0][...,:4]
+            box_corner = label_bboxes.new(label_bboxes.shape)
+            box_corner[...,0] = (label_bboxes[...,0] - label_bboxes[...,2]/2) # x_c - w/2 = x_min
+            box_corner[...,1] = (label_bboxes[...,1] - label_bboxes[...,3]/2) # y_c - h/2 = y_min
+            box_corner[...,2] = (label_bboxes[...,0] + label_bboxes[...,2]/2) # x_c + w/2 = x_max
+            box_corner[...,3] = (label_bboxes[...,1] + label_bboxes[...,3]/2) # y_c + h/2 = y_max
+
+            if images[0].max()>15: # sketchy way to check if its normalised or not
+                ax.imshow(images[i].type(torch.int32).permute(1,2,0))
+            else:
+                ax.imshow(images[i].permute(1,2,0))
+            
+            for box in box_corner:
+                x_points = [box[0], box[0], box[2], box[2], box[0]]
+                y_points = [box[1], box[3], box[3], box[1], box[1]]
+                
+                ax.plot(x_points, y_points, 'r-', linewidth=0.5)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(f"Labels: {box_corner.shape[0]}  ||  Objects: {box_corner.unique(dim=0).shape[0]}")
+
+    plt.gcf().set_size_inches(20,10)
+
+def distort_label(label, deltas):
+    dx, dy, dw, dh = deltas
+
+    cur_bboxes = label[...,:4]
+    obj_mask = (cur_bboxes.sum(dim=1) != 0).unsqueeze(1)
+
+    t_mat = cur_bboxes.new(cur_bboxes.shape)
+
+    t_mat[...,0] = dx
+    t_mat[...,1] = dy
+    t_mat[...,2] = dw
+    t_mat[...,3] = dh
+    t_mat = t_mat*obj_mask
+
+    transformed_bboxes = label[...,:4] + t_mat
+    transformed_label = label.clone()
+    transformed_label[...,:4] = transformed_bboxes
+
+    return transformed_label
+
 def img_mean_std(img_dir: str):
     """Calculate the means and standard deviations of each pixel channel of image dataset.
 
@@ -215,7 +287,7 @@ def img_mean_std(img_dir: str):
     all_img = io.imread(os.path.join(img_dir, img_names[0]))
     
     # iterate through rest of dataset and concat all images into a single long image
-    for i, image in enumerate(tqdm(img_names)):
+    for i, image in enumerate(img_names):
         if i>0:
             all_img = np.concatenate((all_img, io.imread(os.path.join(img_dir, image))))
 
@@ -412,7 +484,7 @@ class Pad(object):
         resized_image = cv2.resize(image, (new_w, new_h), interpolation = cv2.INTER_CUBIC)
 
         # make a canvas sized (output_size, output_size) filled with padding colour
-        canvas = np.full((self.output_size, self.output_size, 3), 128/255)
+        canvas = np.full((self.output_size, self.output_size, 3), 128/255) # 128 = grey
 
         # put image into pad canvas such that the padding now fills edges to create padded image of size (output_size, output_size)
         canvas[(self.output_size-new_h)//2:(self.output_size-new_h)//2 + new_h,(self.output_size-new_w)//2:(self.output_size-new_w)//2 + new_w,  :] = resized_image

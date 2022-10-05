@@ -6,8 +6,8 @@ class Yolo_Loss(nn.Module):
         super().__init__()
         # lambda constants
         self.LAMBDA_CLS = 1
-        self.LAMBDA_NO_OBJ = 5
-        self.LAMBDA_BBOX = 1
+        self.LAMBDA_NO_OBJ = 2
+        self.LAMBDA_BBOX = 2
         self.LAMBDA_OBJ = 1
 
         self.bce = nn.BCELoss()
@@ -97,8 +97,9 @@ class Yolo_Loss(nn.Module):
         ################################################################################
 
         # BBOX LOSS
+        
         bbox_centre_loss = self.mse(
-            (torch.sqrt(pred_bbox_centre[objs])), (torch.sqrt(label_bbox_centre[objs]))
+            (pred_bbox_centre[objs]), (label_bbox_centre[objs])
         )
         bbox_dims_loss = self.mse(
             (torch.sqrt(pred_bbox_dims[objs])), (torch.sqrt(label_bbox_dims[objs]))

@@ -26,7 +26,7 @@ def arg_parse():
         "--images",
         dest="images",
         help="Indiv image or directory of images to perform detection on.",
-        default="imgs",
+        default="images",
         type=str
     )
     parser.add_argument(
@@ -97,8 +97,9 @@ classes = load_classes("data/bdd100k.names")
 ## init network and load weights
 print("Loading network...")
 model = Net(args.cfgfile)
-weight_path = "weights/100_images.weights"
+weight_path = "weights/during_run/epoch_19.weights"
 model.load_state_dict(torch.load(weight_path))
+#model.load_weights("weights/pretrained.weights")
 print("Network loaded!")
 
 model.net_info["height"] = args.res
