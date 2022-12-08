@@ -5,7 +5,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
-import cv2 
+import cv2
+from skimage import io
 import argparse
 import os 
 import os.path as osp
@@ -85,8 +86,8 @@ images = args.images # dir/image
 batch_size = int(args.bs) 
 confidence = float(args.confidence)
 nms_thresh = float(args.nms_thresh)
-mean = [92.11938007161459, 102.83839236762152, 104.90335580512152]
-std = [66.09941202519124, 70.6808655565459, 75.05305001603533]
+mean = [92, 103, 105]
+std = [66, 71, 75]
 start = 0 # for timing
 CUDA = torch.cuda.is_available()
 
@@ -97,7 +98,8 @@ classes = load_classes("data/bdd100k.names")
 ## init network and load weights
 print("Loading network...")
 model = Net(args.cfgfile)
-weight_path = "weights/during_run/epoch_19.weights"
+#weight_path = "weights/during_run/epoch_6.weights"
+weight_path = "weights/normed.weights"
 model.load_state_dict(torch.load(weight_path))
 #model.load_weights("weights/pretrained.weights")
 print("Network loaded!")
@@ -135,7 +137,7 @@ if not os.path.exists(args.dets):
 load_batch = time.time() # another checkpoint
 
 # load image pixel values into list loaded_imgs
-loaded_imgs = [cv2.imread(img) for img in img_list]
+loaded_imgs = [io.imread(img) for img in img_list]
 
 # opencv loads images as np array with dims BxGxR
 # use prep_image to:
@@ -206,10 +208,10 @@ for idx, batch in enumerate(img_batches):
     
     # feed batch into the model and predict classes, bboxes
     with torch.no_grad():
-        #torch.save(batch, "ex_tensors/model_input_{}".format(idx))
+        torch.save(batch, f"ex_tensors/model_input_{idx}")
         prediction = model(Variable(batch), CUDA)
     
-    #torch.save(prediction, "{}.pt".format(idx))
+    torch.save(prediction, f"ex_tensors/det_{idx}.pt")
 
     # separate results of the prediction
     prediction = write_results(
@@ -219,8 +221,10 @@ for idx, batch in enumerate(img_batches):
         nms_conf=nms_thresh
     )
     end = time.time()
-    
+
     #print(prediction)
+    #prediction[:,1:5] = prediction[:,1:5]#*416 # TODO
+    torch.save(prediction, "ex_tensors/detect_prediction.pt") # TODO
 
     if type(prediction) == int:
         for img_num, image in enumerate(img_list[idx*batch_size:min((idx+1)*batch_size, len(img_list))]):
@@ -311,7 +315,7 @@ print(img_list)
 det_names = pd.Series(img_list).apply(lambda x: "{}/det_{}".format(args.dets, x.split("/")[-1]))
 
 # write images with dets to address in det_names
-list(map(cv2.imwrite, det_names, loaded_imgs))
+list(map(io.imsave, det_names, loaded_imgs))
 print(det_names)
 end = time.time()
 

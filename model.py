@@ -296,8 +296,10 @@ class Net(nn.Module):
                 # print(x.requires_grad)
                 #x = x.data
 
+                torch.save(x, "ex_tensors/before_pred_trans.pt")
+
                 x = predict_transform(
-                    prediction=x, # size (n_batches, n_conv_filters_from_prev_layer, filter_w, filter_h)
+                    prediction=x, # size (n_batches, n_conv_filters_from_prev_layer=(n_classes+5)*3, filter_w, filter_h)
                     in_dims=in_dims, # model height
                     anchors=anchors, # [(a1_w, a1_h), (a2_w, a2_h), (a3_w, a3_h)]
                     n_classes=n_classes,

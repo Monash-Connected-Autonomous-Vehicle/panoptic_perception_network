@@ -28,9 +28,9 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     #torch.save(prediction, "yolo_layer_input.pt")
     batch_size = prediction.shape[0]
     stride = in_dims // prediction.shape[2]
-    grid_size = prediction.shape[2]
+    grid_size = prediction.shape[2] # by default, either 13, 26 or 52
     bbox_attrs = 5 + n_classes
-    n_anchors = len(anchors)
+    n_anchors = len(anchors) # by default 3, as there are 3 anchor box sizes for each grid size
     eps = 1e-10
 
     # print("PRE:")
@@ -38,9 +38,9 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     # print("Grad fn")
     # print(prediction.grad_fn)
 
-    # reshaping
-    prediction = prediction.view(batch_size, bbox_attrs*n_anchors, grid_size*grid_size)  # size (n_batches, n_conv_filters, (grid_w*grid_h))
-    prediction = prediction.transpose(1,2).contiguous()                                  # size (n_batches, (grid_w*grid_h), n_conv_filters)
+    # reshaping from (n_batches, n_conv_filters, grid_size, grid_size)
+    prediction = prediction.view(batch_size, bbox_attrs*n_anchors, grid_size*grid_size)  # size (n_batches, (4+1+n_classes)*n_anchors, (grid_w*grid_h))
+    prediction = prediction.transpose(1,2).contiguous()                                  # size (n_batches, (grid_w*grid_h), (4+1+n_classes)*n_anchors)
     prediction = prediction.view(batch_size, grid_size*grid_size*n_anchors, bbox_attrs)  # size (n_batches, (grid_w*grid_h*n_anchors), 4+1+n_classes)
 
     # divide anchors by stride of detection feature map as input image is larger than detection map by a factor of stride
@@ -87,7 +87,7 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     # print("before:")
     # print(f"    min:    {torch.min(prediction[:,:,2:4])}")
     # print(f"    max:    {torch.max(prediction[:,:,2:4])}")
-    prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors + eps
+    prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors + eps # TODO: eps not needed
     # print("after:")
     # print(f"    min:    {torch.min(prediction[:,:,2:4])}")
     # print(f"    max:    {torch.max(prediction[:,:,2:4])}")
@@ -100,9 +100,15 @@ def predict_transform(prediction: torch.FloatTensor, in_dims: int, anchors, n_cl
     # if input image is 416x416, multiply attributes by 32, or stride
 
     # only need to apply to x, y centres, height and width
+    # x by grid offsets from before (0 - 13/26/52), then x stride -> back to 416,416
     prediction[:,:,:4] = prediction[:,:,:4]*stride
 
-    # print("POST: {}".format(prediction.shape))
+    #print(prediction[0][:4])
+
+    # normalise 
+    prediction[:,:,:4] = prediction[:,:,:4]/in_dims # TODO
+
+    #print(prediction[0][:4])
     # print(prediction)
 
     return prediction
@@ -181,7 +187,7 @@ def write_results(prediction: torch.FloatTensor, confidence: float, n_classes: i
     box_corner[:,:,2] = (prediction[:,:,0] + prediction[:,:,2]/2)
     box_corner[:,:,3] = (prediction[:,:,1] + prediction[:,:,3]/2)
     # replace in the prediction tensor
-    prediction[:,:,:4] = box_corner[:,:,:4]
+    prediction[:,:,:4] = box_corner[:,:,:4]*416
 
     # cannot vectorise confidence thresholding and nms
     # loop over first dim of prediction which contains indexes of images in a batch
@@ -335,16 +341,31 @@ def prep_image(img, in_dims, mean, std):
     
     Returns a Variable 
     """
-    img = img.astype(np.float32)
+    img = img.astype(float)
     # first normalise image
     img[:,:,0] = (img[:,:,0] - mean[0])/std[0]
     img[:,:,1] = (img[:,:,1] - mean[1])/std[1]
     img[:,:,2] = (img[:,:,2] - mean[2])/std[2]
 
-    # then pad the image
-    img = (norm_with_padding(img, (in_dims, in_dims)))
-    # then transpose to correct dims order and tensorise 
-    img = img[:,:,::-1].transpose((2,0,1)).copy()
-    img = torch.from_numpy(img).float().unsqueeze(0)
+    h, w = img.shape[:2]
+    if isinstance(in_dims, int):
+        new_h, new_w = in_dims*h/w, in_dims
+    else:
+        new_h, new_w = in_dims
+
+    new_h, new_w = int(new_h), int(new_w)
+
+    resized_image = cv2.resize(img, (new_w, new_h), interpolation = cv2.INTER_CUBIC)
+    canvas = np.full((in_dims, in_dims, 3), 128/255)
+    canvas[(in_dims-new_h)//2:(in_dims-new_h)//2 + new_h,(in_dims-new_w)//2:(in_dims-new_w)//2 + new_w,  :] = resized_image
+    canvas = canvas.transpose((2,0,1)).astype(np.float32)
+    canvas = torch.from_numpy(canvas).unsqueeze(0)
+    #print(canvas.shape)
     
-    return img
+    # # then pad the image
+    # img = (norm_with_padding(img, (in_dims, in_dims)))
+    # # then transpose to correct dims order and tensorise 
+    # img = img[:,:,::-1].transpose((2,0,1)).copy()
+    # img = torch.from_numpy(img).float().unsqueeze(0)
+    
+    return canvas

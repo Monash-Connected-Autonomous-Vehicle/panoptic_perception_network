@@ -140,10 +140,10 @@ def bbox_anchorbox_iou(bbox: np.ndarray, anchor_boxes: np.ndarray) -> np.ndarray
     b2_x1, b2_y1, b2_x2, b2_y2 = anchor_boxes[:,0], anchor_boxes[:,1], anchor_boxes[:,2], anchor_boxes[:,3]
 
     # reshape so that we can vectorise operations
-    x1_comparisons = np.concatenate((np.expand_dims(b1_x1.repeat(3),1), np.expand_dims(b2_x1, 1)), axis=1)
-    x2_comparisons = np.concatenate((np.expand_dims(b1_x2.repeat(3),1), np.expand_dims(b2_x2, 1)), axis=1)
-    y1_comparisons = np.concatenate((np.expand_dims(b1_y1.repeat(3),1), np.expand_dims(b2_y1, 1)), axis=1)
-    y2_comparisons = np.concatenate((np.expand_dims(b1_y2.repeat(3),1), np.expand_dims(b2_y2, 1)), axis=1)
+    x1_comparisons = np.concatenate((np.expand_dims(b1_x1.repeat(9),1), np.expand_dims(b2_x1, 1)), axis=1)
+    x2_comparisons = np.concatenate((np.expand_dims(b1_x2.repeat(9),1), np.expand_dims(b2_x2, 1)), axis=1)
+    y1_comparisons = np.concatenate((np.expand_dims(b1_y1.repeat(9),1), np.expand_dims(b2_y1, 1)), axis=1)
+    y2_comparisons = np.concatenate((np.expand_dims(b1_y2.repeat(9),1), np.expand_dims(b2_y2, 1)), axis=1)
 
     # get coords of intersection
     intersect_x1 = np.max(x1_comparisons, axis=1)
@@ -165,6 +165,22 @@ def bbox_anchorbox_iou(bbox: np.ndarray, anchor_boxes: np.ndarray) -> np.ndarray
     iou = intersect_area/union_area
 
     return iou    
+
+def resize_image(image, output_size=416):
+    h, w = image.shape[:2]
+    if isinstance(output_size, int): # the int specifies the smaller dimension, other dim scales based on it
+        #if h > w:
+        new_h, new_w = output_size*h/w, output_size
+        #else:
+        #    new_h, new_w = self.output_size, self.output_size*w/h
+    else: # if tuple then completely specified dims
+        new_h, new_w = output_size
+
+    new_h, new_w = int(new_h), int(new_w)
+    resized_image = cv2.resize(image, (new_w, new_h), interpolation = cv2.INTER_CUBIC)
+    canvas = np.full((output_size, output_size, 3), 128) # 128 = grey
+    canvas[(output_size-new_h)//2:(output_size-new_h)//2 + new_h,(output_size-new_w)//2:(output_size-new_w)//2 + new_w,  :] = resized_image
+    return canvas, new_h, new_w
 
 def draw_bbox(image: np.ndarray, bboxes: np.ndarray):
     """Draw all bboxes over image.
@@ -337,6 +353,10 @@ class DetectionDataset(Dataset):
 
         # check in image
         image = io.imread(os.path.join(self.root_dir, img_name))
+
+        ## TODO: convert image to 416x416
+        resized_image, new_img_h, new_img_w = resize_image(image)
+        #print(new_img_h, new_img_w)
         
         ## collect all labels per image
         category_labels = []
@@ -369,6 +389,7 @@ class DetectionDataset(Dataset):
             bbox_labels.append(cur_image)
         bboxes = bbox_labels[idx]
         bboxes = np.array(bboxes) # size (n_bboxes, 4) -> [x1, y1, x2, y2]
+        #print(bboxes.shape)
 
         ## form labels to compare with output of forward pass
         # loop through each grid size
@@ -377,25 +398,32 @@ class DetectionDataset(Dataset):
         anchors = self.anchors
         n_anchors = anchors.shape[1]
 
-        img_w, img_h = image.shape[0], image.shape[1]
+        ## TODO: convert labels to 416x416 compatible
+        og_img_h, og_img_w = image.shape[0], image.shape[1]
+        grid_img_w, grid_img_h = 416, 416
+        #print(og_img_w, og_img_h)
+
+        bboxes = bboxes * [new_img_w/og_img_w, new_img_h/og_img_h, new_img_w/og_img_w, new_img_h/og_img_h]
+        bboxes[:,1] = bboxes[:,1] + (416-new_img_h)//2
+        bboxes[:,3] = bboxes[:,3] + (416-new_img_h)//2
 
         write = 0 # flag for knowing which grid cell size we are up to
         
         ## Loop through and create labels for each grid within grid_sizes
         for g, grid_size in enumerate(grid_sizes):
             # create meshgrid to fit bbox centres
-            grid = np.arange(1, grid_size+1)
+            grid = np.arange(grid_size)
             a,b = np.meshgrid(grid,grid)
-            stride_x, stride_y = (img_w//grid_size), (img_h//grid_size)
+            stride_x, stride_y = (grid_img_w//grid_size), (grid_img_h//grid_size)
 
             # initiate empty grid cells
             labels = np.zeros(shape=(grid_size, grid_size, n_anchors, 5+n_classes))
-
+            print(f"grid_size: {grid_size}")
             # calculate grid cell centres
             a *= stride_x 
             b *= stride_y 
-            a = a - stride_x/2
-            b = b - stride_y/2
+            a = a + stride_x/2
+            b = b + stride_y/2
 
             # loop through each labelled obj in image
             for i, bbox in enumerate(bboxes):
@@ -419,8 +447,8 @@ class DetectionDataset(Dataset):
                 ## now find which of the 3 anchor boxes in corresponding grid size best describes bbox label 
                 
                 # repeat bbox label's centre coords and then append these to the 3 anchor box widths, heights
-                bbox_tile = np.tile(new_bbox[:2], [3,1])
-                anchor_boxes = np.concatenate((bbox_tile, anchors[g]), 1) # reference the g'th set of anchor dims corresponding to gth grid_size
+                bbox_tile = np.tile(new_bbox[:2], [9,1])
+                anchor_boxes = np.concatenate((bbox_tile, anchors.reshape(-1,2)), 1) # reference the g'th set of anchor dims corresponding to gth grid_size
 
                 # convert these abox attrs from [x_c, y_c, w, h] -> [x1, y1, x2, y2]
                 anchor_boxes = centre_dims_to_corners(anchor_boxes)
@@ -428,17 +456,26 @@ class DetectionDataset(Dataset):
                 # calculate IoUs between current bbox and the set of aboxes
                 # then find idx of abox that best describes the current bbox (has highest IoU)
                 anchorbox_ious = bbox_anchorbox_iou(bbox, anchor_boxes)
+                #print(anchorbox_ious)
                 anchorbox_idx = np.argmax(anchorbox_ious)
+                #print(anchorbox_idx)
 
-                # fill in object label
-                # recall labels size (grid_size, grid_size, n_anchors, 5+n_classes)
-                labels[w_idx][h_idx][anchorbox_idx] = obj_cell_label
+                # based on which IoU is best, only save the label to the belonging grid size
+                if (anchorbox_idx < (g+1)*3) and (anchorbox_idx - g*3 >= 0):
+                    anchorbox_idx = anchorbox_idx - g*3
+                    #print(anchorbox_idx)
+                    # fill in object label
+                    # recall labels size (grid_size, grid_size, n_anchors, 5+n_classes)
+                    labels[h_idx][w_idx][anchorbox_idx] = obj_cell_label
+                    print(f"[{w_idx}, {h_idx}, {anchorbox_idx}]: {obj_cell_label}")
 
             # reshape to size (grid_size*grid_size*n_anchors, 5+n_classes)
             # therefore, each label with an obj is now store at idx:
             #   (w_idx*grid_size + h_idx)*n_anchors + anchorbox_idx
-            labels = labels.reshape(-1,5+n_classes)
-            #print(labels.shape)
+            print(labels.shape) # (13, 13, 3, 12)
+
+            labels = labels.reshape(grid_size*grid_size*n_anchors,5+n_classes)
+            print(labels[...,4].nonzero())
 
             # now create the full label with all grid sizes
             if not write:
@@ -446,11 +483,17 @@ class DetectionDataset(Dataset):
                 write = 1
             else:
                 all_labels = np.concatenate((all_labels, labels), axis=0)
-
+        print("ALL LABELS")
+        print(all_labels[...,4].nonzero())
         sample = {"image": image, "labels": all_labels} # can also return "bbox": bboxes, "category": categories,
+        # image: raw image - has not been normalised/resized
+        # labels: compatible in 416x416 - no need to transform in Pad() anymore?
 
         if self.transform:
             sample = self.transform(sample)
+
+        # normalise bbox width, height, centre coords to between [0,1]
+        sample["labels"][...,:4] = sample["labels"][...,:4]/416 # TODO
 
         return sample
     
@@ -489,17 +532,17 @@ class Pad(object):
         # put image into pad canvas such that the padding now fills edges to create padded image of size (output_size, output_size)
         canvas[(self.output_size-new_h)//2:(self.output_size-new_h)//2 + new_h,(self.output_size-new_w)//2:(self.output_size-new_w)//2 + new_w,  :] = resized_image
 
-        ## resize bbox labels
+        # ## resize bbox labels
 
-        # h and w are swapped for labels because for images,
-        # x and y axes are axis 1 and 0 respectively
-        # broadcast (n_bboxes, 4) * (1, 4)
-        labels[:, :4] = labels[:, :4] * [new_w/w, new_h/h, new_w/w, new_h/h]
+        # # h and w are swapped for labels because for images,
+        # # x and y axes are axis 1 and 0 respectively
+        # # broadcast (n_bboxes, 4) * (1, 4)
+        # labels[:, :4] = labels[:, :4] * [new_w/w, new_h/h, new_w/w, new_h/h]
 
-        # add the height padding offset but only add to labels with actual detections
-        # filter out all non detection labels or else it will mess up the entire label array
-        # i.e. non detection labels wont be full vector of 0s anymore
-        labels[:, 1] = labels[:, 1] + ((self.output_size-new_h)//2)*(~np.all(labels==0, axis=1))
+        # # add the height padding offset but only add to labels with actual detections
+        # # filter out all non detection labels or else it will mess up the entire label array
+        # # i.e. non detection labels wont be full vector of 0s anymore
+        # labels[:, 1] = labels[:, 1] + ((self.output_size-new_h)//2)*(~np.all(labels==0, axis=1))
 
         return {"image": canvas, "labels": labels}
 

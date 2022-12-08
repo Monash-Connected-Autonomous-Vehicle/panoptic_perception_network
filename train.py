@@ -61,6 +61,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ## Load data
 label_dict = "/home/mcav/DATASETS/bdd100k/labels/bdd100k_labels_images_val.json"   # labels json 
 root_dir = "/home/mcav/DATASETS/bdd100k/images/100k/val"                # images file
+grid_sizes = [13, 26, 52]
+img_size = 416
+anchors = np.array([                        # anchor box sizes per grid size
+            [[116,90], [156,198], [373,326]],   
+            [[30, 61], [62, 45], [59,119]],
+            [[10, 13], [16, 30], [33, 23]],
+])
 
 # hyperparams
 # val size: 10,000
@@ -106,18 +113,14 @@ transformed_train_data = DetectionDataset(
     label_dict=label_dict,                      # labels corresponding to images
     root_dir=root_dir,                          # images root dir
     classes_file="data/bdd100k.names",          # class names
-    grid_sizes=[13, 26, 52],                    # grid sizes for detection
-    anchors = np.array([                        # anchor box sizes per grid size
-            [[116,90], [156,198], [373,326]],   
-            [[30, 61], [62, 45], [59,119]],
-            [[10, 13], [16, 30], [33, 23]],
-        ]),
+    grid_sizes=grid_sizes,                      # grid sizes for detection
+    anchors=anchors,
     transform=transforms.Compose([              # transforms
         Normalise(                              # 1. normalise
             mean=rgb_mean,                      
             std=rgb_std
         ),
-        Pad(416),                               # 2. padding
+        Pad(img_size),                          # 2. padding
         ToTensor()                              # 3. convert to tensor
     ])
 )
@@ -126,8 +129,8 @@ transformed_train_data = DetectionDataset(
 train_loader = DataLoader(
     transformed_train_data,
     batch_size=bs,
-    shuffle=True,
-    num_workers=8,
+    shuffle=False,
+    num_workers=1, # TODO: 8
     pin_memory=True,
 )
 load_dataset_end = time.time()
@@ -251,4 +254,5 @@ for epoch in range(n_epoch): # each image gets 3 detections, this happens n_epoc
 print("Training complete.")
 
 # save weights
-torch.save(net.state_dict(), f"weights/{opt}_{bs}_{learning_rate}_{n_epoch}_val.weights")
+#torch.save(net.state_dict(), f"weights/{opt}_{bs}_{learning_rate}_{n_epoch}_val.weights")
+torch.save(net.state_dict(), "weights/normed.weights")

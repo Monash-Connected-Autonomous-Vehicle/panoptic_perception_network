@@ -123,8 +123,9 @@ for i, batch in enumerate(im_batches):
     with torch.no_grad():
         prediction = model(Variable(batch), CUDA)
 
+    torch.save(prediction, f"og_ex_tensors/raw_pred_{i}.pt")
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
-
+    torch.save(prediction, f"og_ex_tensors/clean_pred_{i}.pt")
     end = time.time()
 
     if type(prediction) == int:

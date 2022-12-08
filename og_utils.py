@@ -135,53 +135,54 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
         zero_mat = torch.zeros((image_pred_.shape[0], 1)).cuda()
     output = torch.cat((zero_mat, image_pred_), 1)
   
-        # #Get the various classes detected in the image
-        # img_classes = unique(image_pred_[:,-1])  # -1 index holds the class index
-        
-        
-        # for cls in img_classes:
-        #     #perform NMS
+    #Get the various classes detected in the image
+    img_classes = unique(image_pred_[:,-1])  # -1 index holds the class index
+    
+    
+    for cls in img_classes:
+        #perform NMS
 
+    
+        #get the detections with one particular class
+        cls_mask = image_pred_*(image_pred_[:,-1] == cls).float().unsqueeze(1)
+        class_mask_ind = torch.nonzero(cls_mask[:,-2]).squeeze()
+        image_pred_class = image_pred_[class_mask_ind].view(-1,7)
         
-        #     #get the detections with one particular class
-        #     cls_mask = image_pred_*(image_pred_[:,-1] == cls).float().unsqueeze(1)
-        #     class_mask_ind = torch.nonzero(cls_mask[:,-2]).squeeze()
-        #     image_pred_class = image_pred_[class_mask_ind].view(-1,7)
+        #sort the detections such that the entry with the maximum objectness
+        #confidence is at the top
+        conf_sort_index = torch.sort(image_pred_class[:,4], descending = True )[1]
+        image_pred_class = image_pred_class[conf_sort_index]
+        idx = image_pred_class.size(0)   #Number of detections
+        
+        for i in range(idx):
+            #Get the IOUs of all boxes that come after the one we are looking at 
+            #in the loop
+            try:
+                ious = bbox_iou(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:])
+            except ValueError:
+                break
+        
+            except IndexError:
+                break
+        
+            #Zero out all the detections that have IoU > treshhold
+            iou_mask = (ious < nms_conf).float().unsqueeze(1)
+            image_pred_class[i+1:] *= iou_mask       
+        
+            #Remove the non-zero entries
+            non_zero_ind = torch.nonzero(image_pred_class[:,4]).squeeze()
+            image_pred_class = image_pred_class[non_zero_ind].view(-1,7)
             
-        #     #sort the detections such that the entry with the maximum objectness
-        #     #confidence is at the top
-        #     conf_sort_index = torch.sort(image_pred_class[:,4], descending = True )[1]
-        #     image_pred_class = image_pred_class[conf_sort_index]
-        #     idx = image_pred_class.size(0)   #Number of detections
-            
-        #     for i in range(idx):
-        #         #Get the IOUs of all boxes that come after the one we are looking at 
-        #         #in the loop
-        #         try:
-        #             ious = bbox_iou(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:])
-        #         except ValueError:
-        #             break
-            
-        #         except IndexError:
-        #             break
-            
-        #         #Zero out all the detections that have IoU > treshhold
-        #         iou_mask = (ious < nms_conf).float().unsqueeze(1)
-        #         image_pred_class[i+1:] *= iou_mask       
-            
-        #         #Remove the non-zero entries
-        #         non_zero_ind = torch.nonzero(image_pred_class[:,4]).squeeze()
-        #         image_pred_class = image_pred_class[non_zero_ind].view(-1,7)
-                
-        #     batch_ind = image_pred_class.new(image_pred_class.size(0), 1).fill_(ind)      #Repeat the batch_id for as many detections of the class cls in the image
-        #     seq = batch_ind, image_pred_class
-            
-        #     if not write:
-        #         output = torch.cat(seq,1)
-        #         write = True
-        #     else:
-        #         out = torch.cat(seq,1)
-        #         output = torch.cat((output,out))
+        batch_ind = image_pred_class.new(image_pred_class.size(0), 1).fill_(ind)      #Repeat the batch_id for as many detections of the class cls in the image
+        seq = batch_ind, image_pred_class
+        
+        if not write:
+            output = torch.cat(seq,1)
+            write = True
+        else:
+            out = torch.cat(seq,1)
+            output = torch.cat((output,out))
+
 
     try:
         return output

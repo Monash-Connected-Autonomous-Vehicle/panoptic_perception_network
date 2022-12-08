@@ -6,8 +6,8 @@ class Yolo_Loss(nn.Module):
         super().__init__()
         # lambda constants
         self.LAMBDA_CLS = 1
-        self.LAMBDA_NO_OBJ = 2
-        self.LAMBDA_BBOX = 2
+        self.LAMBDA_NO_OBJ = 10
+        self.LAMBDA_BBOX = 10
         self.LAMBDA_OBJ = 1
 
         self.bce = nn.BCELoss()
@@ -33,6 +33,8 @@ class Yolo_Loss(nn.Module):
         
         # print(f"pred:   {prediction}")
         # print(f"label:  {label}")
+        torch.save(prediction, "ex_tensors/loss_pred.pt")
+        torch.save(label, "ex_tensors/loss_label.pt")
 
         # if GPU exists, move tensors there
         if self.CUDA:
