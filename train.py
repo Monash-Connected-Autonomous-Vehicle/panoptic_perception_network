@@ -129,8 +129,8 @@ transformed_train_data = DetectionDataset(
 train_loader = DataLoader(
     transformed_train_data,
     batch_size=bs,
-    shuffle=False,
-    num_workers=1, # TODO: 8
+    shuffle=True,
+    num_workers=8, # TODO: 8
     pin_memory=True,
 )
 load_dataset_end = time.time()

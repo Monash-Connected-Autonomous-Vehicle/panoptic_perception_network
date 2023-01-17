@@ -418,7 +418,8 @@ class DetectionDataset(Dataset):
 
             # initiate empty grid cells
             labels = np.zeros(shape=(grid_size, grid_size, n_anchors, 5+n_classes))
-            print(f"grid_size: {grid_size}")
+            #print(f"grid_size: {grid_size}")
+
             # calculate grid cell centres
             a *= stride_x 
             b *= stride_y 
@@ -467,15 +468,15 @@ class DetectionDataset(Dataset):
                     # fill in object label
                     # recall labels size (grid_size, grid_size, n_anchors, 5+n_classes)
                     labels[h_idx][w_idx][anchorbox_idx] = obj_cell_label
-                    print(f"[{w_idx}, {h_idx}, {anchorbox_idx}]: {obj_cell_label}")
+                    #print(f"[{w_idx}, {h_idx}, {anchorbox_idx}]: {obj_cell_label}")
 
             # reshape to size (grid_size*grid_size*n_anchors, 5+n_classes)
             # therefore, each label with an obj is now store at idx:
             #   (w_idx*grid_size + h_idx)*n_anchors + anchorbox_idx
-            print(labels.shape) # (13, 13, 3, 12)
+            #print(labels.shape) # (13, 13, 3, 12)
 
             labels = labels.reshape(grid_size*grid_size*n_anchors,5+n_classes)
-            print(labels[...,4].nonzero())
+            #print(labels[...,4].nonzero())
 
             # now create the full label with all grid sizes
             if not write:
@@ -483,8 +484,8 @@ class DetectionDataset(Dataset):
                 write = 1
             else:
                 all_labels = np.concatenate((all_labels, labels), axis=0)
-        print("ALL LABELS")
-        print(all_labels[...,4].nonzero())
+        #print("ALL LABELS")
+        #print(all_labels[...,4].nonzero())
         sample = {"image": image, "labels": all_labels} # can also return "bbox": bboxes, "category": categories,
         # image: raw image - has not been normalised/resized
         # labels: compatible in 416x416 - no need to transform in Pad() anymore?
